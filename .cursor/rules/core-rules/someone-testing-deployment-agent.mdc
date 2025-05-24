@@ -1,0 +1,302 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Someone Testing & Deployment Standards
+
+## Critical Rules
+
+- **Test-Driven Development**: Write tests BEFORE implementing multi-platform features
+- **Integration Testing First**: Every platform connector MUST have integration tests with real API responses
+- **Cross-Platform Validation**: All message bridging MUST be tested across minimum 2 platforms
+- **Zero-Downtime Deployments**: All production deployments MUST use blue-green or rolling updates
+- **Environment Parity**: Test environments MUST mirror production configurations exactly
+- **Automated Quality Gates**: No deployment proceeds without passing all automated tests
+- **Rollback Strategy**: Every deployment MUST have a tested rollback plan within 5 minutes
+- **Performance Baselines**: All features MUST meet performance benchmarks before deployment
+
+## Testing Strategy Framework
+
+```typescript
+// Test Categories (in order of execution)
+interface TestSuite {
+  unit: UnitTest[];           // Fast, isolated, 90%+ coverage
+  integration: IntegrationTest[]; // Platform API interactions
+  contract: ContractTest[];   // API compatibility between repos
+  e2e: EndToEndTest[];       // Full user workflows
+  performance: PerformanceTest[]; // Load and stress testing
+  security: SecurityTest[];   // Vulnerability and penetration testing
+}
+
+// Every platform connector MUST implement these tests
+interface PlatformConnectorTests {
+  authentication: () => Promise<boolean>;
+  sendMessage: (testMessage: UniversalMessage) => Promise<boolean>;
+  receiveMessage: (platformMessage: any) => Promise<UniversalMessage>;
+  handleReactions: (reaction: UniversalReaction) => Promise<boolean>;
+  webhookSetup: (channelId: string) => Promise<WebhookInfo>;
+  errorHandling: (invalidInput: any) => Promise<ErrorResponse>;
+  rateLimiting: () => Promise<RateLimitInfo>;
+}
+```
+
+## Integration Testing Standards
+
+```typescript
+// Real platform API testing (not mocks)
+describe('Slack Connector Integration', () => {
+  beforeAll(async () => {
+    // Use dedicated test workspace
+    await setupTestEnvironment('slack-test-workspace');
+  });
+
+  test('should send message to slack channel', async () => {
+    const testMessage: UniversalMessage = {
+      id: 'test-123',
+      content: 'Test message from Someone platform',
+      platform: 'discord',
+      // ... other fields
+    };
+    
+    const slackConnector = new SlackConnector(testCredentials);
+    const result = await slackConnector.sendMessage(testMessage);
+    
+    expect(result.success).toBe(true);
+    expect(result.messageId).toBeDefined();
+    
+    // Verify message actually appears in Slack
+    const retrievedMessage = await slackApi.conversations.history({
+      channel: testChannelId,
+      latest: result.timestamp
+    });
+    
+    expect(retrievedMessage.messages[0].text).toContain('Test message');
+  });
+});
+```
+
+## Deployment Pipeline Architecture
+
+```yaml
+# GitHub Actions CI/CD Pipeline
+name: Someone Platform Deployment
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [discord, website, docs]
+    steps:
+      - name: Run Unit Tests
+        run: npm test
+      - name: Run Integration Tests
+        env:
+          DISCORD_TEST_TOKEN: ${{ secrets.DISCORD_TEST_TOKEN }}
+          SLACK_TEST_TOKEN: ${{ secrets.SLACK_TEST_TOKEN }}
+        run: npm run test:integration
+      - name: Run Security Scan
+        run: npm audit && npm run security:scan
+
+  contract-testing:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: API Contract Tests
+        run: |
+          # Start Someone-Discord in test mode
+          npm run start:test &
+          # Test Someone-Website against Discord API
+          cd ../Someone-Website && npm run test:contract
+      
+  deploy-staging:
+    needs: [test, contract-testing]
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Staging
+        run: |
+          # Blue-green deployment
+          npm run deploy:staging:prepare
+          npm run deploy:staging:switch
+          npm run deploy:staging:cleanup
+
+  performance-test:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load Testing
+        run: |
+          # Test with 1000 concurrent bridges
+          npm run perf:load-test
+          # Verify <100ms response time
+          npm run perf:validate-sla
+
+  deploy-production:
+    needs: performance-test
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Production Deployment
+        run: |
+          npm run deploy:production:blue-green
+          npm run health-check:production
+          npm run deploy:production:complete
+```
+
+## Environment Configuration
+
+```typescript
+// Environment-specific configurations
+interface EnvironmentConfig {
+  name: 'development' | 'staging' | 'production';
+  database: {
+    url: string;
+    poolSize: number;
+    ssl: boolean;
+  };
+  platforms: {
+    discord: { botToken: string; applicationId: string; };
+    slack: { botToken: string; signingSecret: string; };
+    teams: { clientId: string; clientSecret: string; };
+  };
+  ai: {
+    openai: { apiKey: string; model: string; };
+    google: { apiKey: string; projectId: string; };
+  };
+  monitoring: {
+    sentry: { dsn: string; };
+    datadog: { apiKey: string; };
+  };
+  features: {
+    aiTranslation: boolean;
+    enterpriseFeatures: boolean;
+    betaFeatures: boolean;
+  };
+}
+
+// Configuration validation
+function validateEnvironment(config: EnvironmentConfig): void {
+  if (config.name === 'production') {
+    assert(config.database.ssl, 'Production MUST use SSL');
+    assert(config.platforms.discord.botToken, 'Discord token required');
+    assert(config.monitoring.sentry.dsn, 'Monitoring required in production');
+  }
+}
+```
+
+## Quality Gates & Metrics
+
+```typescript
+// Quality thresholds that MUST be met
+interface QualityGates {
+  testCoverage: number;        // Minimum 85%
+  performanceP95: number;      // <100ms for API calls
+  errorRate: number;           // <0.1% in production
+  securityScore: number;       // A grade or higher
+  uptime: number;              // 99.9% SLA
+}
+
+// Automated quality validation
+async function validateQualityGates(): Promise<boolean> {
+  const metrics = await gatherMetrics();
+  
+  return (
+    metrics.coverage >= 85 &&
+    metrics.p95ResponseTime <= 100 &&
+    metrics.errorRate <= 0.001 &&
+    metrics.securityGrade >= 'A' &&
+    metrics.uptime >= 0.999
+  );
+}
+```
+
+## Examples
+
+<example>
+```typescript
+// Valid: Comprehensive test coverage
+describe('Universal Bridge', () => {
+  describe('Unit Tests', () => {
+    test('should convert Discord message to Universal format', () => {
+      const discordMessage = createMockDiscordMessage();
+      const universal = discordConnector.toUniversal(discordMessage);
+      expect(universal).toMatchSchema(UniversalMessageSchema);
+    });
+  });
+
+  describe('Integration Tests', () => {
+    test('should bridge message from Discord to Slack', async () => {
+      const bridge = await createTestBridge(['discord', 'slack']);
+      const sentMessage = await sendDiscordMessage(testChannelId, 'Hello');
+      
+      // Wait for message to propagate
+      await waitFor(() => 
+        getSlackMessages(testSlackChannel).length > 0
+      );
+      
+      const slackMessages = await getSlackMessages(testSlackChannel);
+      expect(slackMessages[0].text).toBe('Hello');
+    });
+  });
+});
+
+// Valid: Blue-green deployment
+async function deployProduction() {
+  // Prepare green environment
+  await deployToGreen(newVersion);
+  await runSmokeTests('green');
+  
+  // Switch traffic
+  await switchTrafficToGreen();
+  
+  // Monitor for 5 minutes
+  const healthCheck = await monitorHealth(5 * 60 * 1000);
+  if (!healthCheck.success) {
+    await rollbackToBlue();
+    throw new Error('Deployment failed health check');
+  }
+  
+  // Cleanup old blue environment
+  await cleanupBlue();
+}
+```
+</example>
+
+<example type="invalid">
+```typescript
+// Invalid: Testing with mocks instead of real APIs
+test('should send message to slack', async () => {
+  const mockSlack = jest.mock('slack-api');
+  mockSlack.chat.postMessage.mockResolvedValue({ ok: true });
+  
+  const result = await slackConnector.sendMessage(testMessage);
+  expect(result.success).toBe(true);
+  // This doesn't test real Slack API behavior!
+});
+
+// Invalid: Direct production deployment
+async function deploy() {
+  // No testing, no staging, no rollback plan!
+  await deployToProduction(newCode);
+  console.log('Deployed! Hope it works!');
+}
+
+// Invalid: Insufficient error handling in tests
+test('should handle API failure', async () => {
+  try {
+    await slackConnector.sendMessage(invalidMessage);
+  } catch (error) {
+    // Test passes but we don't verify the error type or recovery
+  }
+});
+```
+</example>

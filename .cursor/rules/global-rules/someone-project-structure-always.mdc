@@ -1,0 +1,117 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Someone Project Structure & Development Workflow
+
+## Critical Rules
+
+- **Unified Branding**: All repositories MUST use "Someone" as the primary brand name, with descriptive suffixes (Someone-Discord, Someone-Docs, Someone-Website)
+- **Shared Configuration**: Common development tools (ESLint, Prettier, TypeScript configs) MUST be consistent across all repositories
+- **API-First Development**: Someone-Discord provides the core API, Someone-Website consumes it, Someone-Docs documents it
+- **Environment Parity**: All three repositories MUST support the same deployment environments (dev, staging, production)
+- **Shared Dependencies**: Use exact version matching for shared dependencies across repositories
+- **Monorepo-Style Tooling**: Even though separate repos, use consistent package.json scripts and development workflows
+- **Cross-Repo Documentation**: Each repository MUST document its integration points with other Someone projects
+- **Unified Error Handling**: All repositories MUST use the same error codes and logging format for integration issues
+
+## Repository Responsibilities
+
+### Someone-Discord (Core Platform)
+- Universal Chat Bridge API and business logic
+- Platform connectors (Discord, Slack, Teams, etc.)
+- Database management and migrations
+- Real-time message processing
+- Authentication and authorization
+- Metrics and analytics collection
+
+### Someone-Website (Public Interface)  
+- Marketing landing page and product information
+- User registration and account management
+- Bridge configuration and management UI
+- Real-time dashboard for bridge monitoring
+- Billing and subscription management
+- Public API documentation
+
+### Someone-Docs (Documentation Hub)
+- Developer documentation and API reference
+- Integration guides for each platform
+- Best practices and architectural decisions
+- SDK documentation and examples
+- Community guidelines and support resources
+
+## File Structure Standards
+
+```
+Someone-[Component]/
+├── .cursor/
+│   └── rules/           # Component-specific rules
+├── src/
+│   ├── api/            # API routes and controllers
+│   ├── connectors/     # Platform-specific connectors (Discord repo only)
+│   ├── models/         # Data models and schemas
+│   ├── services/       # Business logic services
+│   ├── utils/          # Shared utilities
+│   └── types/          # TypeScript type definitions
+├── tests/
+│   ├── unit/          # Unit tests
+│   ├── integration/   # Integration tests
+│   └── e2e/           # End-to-end tests
+├── docs/              # Component-specific documentation
+├── deploy/            # Deployment configurations
+├── package.json
+├── tsconfig.json
+├── .env.example
+└── README.md
+```
+
+## Development Workflow
+
+1. **Feature Development**: Start in Someone-Discord for API changes, then update Website/Docs
+2. **Testing Strategy**: Integration tests MUST verify cross-repo functionality
+3. **Deployment Order**: Discord → Website → Docs to ensure API compatibility
+4. **Version Synchronization**: Use semantic versioning with coordinated releases
+5. **Branch Naming**: Use feature/[component]-[description] format
+6. **Commit Messages**: Use conventional commits with component prefix: `feat(discord): add slack connector`
+
+## Examples
+
+<example>
+```json
+// Valid: Consistent package.json scripts across repos
+{
+  "scripts": {
+    "dev": "nodemon src/index.ts",
+    "build": "tsc && npm run build:assets",
+    "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
+    "lint": "eslint src/**/*.ts",
+    "deploy:staging": "npm run build && npm run deploy -- --env staging",
+    "deploy:production": "npm run build && npm run deploy -- --env production"
+  }
+}
+
+// Valid: Cross-repo API integration
+// Someone-Website calling Someone-Discord API
+const response = await fetch(`${process.env.SOMEONE_API_URL}/api/bridges`, {
+  headers: { 'Authorization': `Bearer ${apiKey}` }
+});
+```
+</example>
+
+<example type="invalid">
+```json
+// Invalid: Inconsistent script names
+{
+  "scripts": {
+    "start": "node index.js",        // Discord repo
+    "dev-server": "webpack serve",   // Website repo  
+    "serve": "vuepress dev"          // Docs repo
+  }
+}
+
+// Invalid: Hardcoded cross-repo dependencies
+const bridges = await fetch('http://localhost:3000/api/bridges');  // Hardcoded URL
+```
+</example>

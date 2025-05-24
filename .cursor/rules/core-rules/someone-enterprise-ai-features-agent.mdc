@@ -1,0 +1,198 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Someone Enterprise & AI Features Development
+
+## Critical Rules
+
+- **Security First**: All enterprise features MUST implement security controls before functionality
+- **Compliance by Design**: Build GDPR, SOC 2, and audit requirements into features from the start
+- **AI Transparency**: All AI features MUST provide explainable results and user control options
+- **Performance SLA**: Enterprise features MUST meet 99.9% uptime and <100ms response time requirements
+- **Data Sovereignty**: Enterprise customers MUST have control over data location and retention
+- **Graceful AI Failures**: When AI services fail, features MUST fallback to non-AI functionality
+- **Enterprise Multi-tenancy**: All features MUST support complete data isolation between customers
+- **Audit Trail Everything**: Every enterprise action MUST generate immutable audit logs
+
+## Enterprise Security Framework
+
+```typescript
+interface EnterpriseSecurityContext {
+  customerId: string;
+  organizationId: string;
+  tenantId: string;
+  userRoles: string[];
+  dataClassification: 'public' | 'internal' | 'confidential' | 'restricted';
+  retentionPolicy: RetentionPolicy;
+  complianceFrameworks: ('SOC2' | 'GDPR' | 'HIPAA' | 'FedRAMP')[];
+}
+
+// All enterprise operations MUST use this context
+async function executeWithSecurityContext<T>(
+  operation: () => Promise<T>,
+  context: EnterpriseSecurityContext
+): Promise<T> {
+  await validatePermissions(context);
+  await logAuditEvent('operation_start', context);
+  try {
+    const result = await operation();
+    await logAuditEvent('operation_success', context);
+    return result;
+  } catch (error) {
+    await logAuditEvent('operation_failed', context, error);
+    throw error;
+  }
+}
+```
+
+## AI Service Integration Standards
+
+```typescript
+interface AIServiceConfig {
+  service: 'openai' | 'google' | 'azure' | 'aws';
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  fallbackStrategy: 'disable' | 'basic' | 'cached';
+  dataRetention: 'none' | '30days' | '90days';
+  privacy: 'shared' | 'isolated' | 'enterprise';
+}
+
+// All AI features MUST support graceful degradation
+async function executeAIFeature<T>(
+  aiOperation: () => Promise<T>,
+  fallbackOperation: () => Promise<T>,
+  config: AIServiceConfig
+): Promise<T> {
+  try {
+    return await aiOperation();
+  } catch (error) {
+    console.warn('AI service failed, using fallback:', error);
+    return await fallbackOperation();
+  }
+}
+```
+
+## Enterprise Data Models
+
+```sql
+-- Enterprise tenant isolation
+CREATE TABLE enterprise_customers (
+  id UUID PRIMARY KEY,
+  organization_name VARCHAR(255) NOT NULL,
+  tier VARCHAR(50) NOT NULL, -- 'enterprise', 'team', 'pro'
+  data_residency VARCHAR(100), -- 'us-east', 'eu-west', 'asia-pacific'
+  encryption_key_id VARCHAR(255),
+  compliance_frameworks TEXT[],
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Audit logging for compliance
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY,
+  customer_id UUID REFERENCES enterprise_customers(id),
+  user_id UUID,
+  action VARCHAR(100) NOT NULL,
+  resource_type VARCHAR(100) NOT NULL,
+  resource_id VARCHAR(255),
+  metadata JSONB,
+  ip_address INET,
+  user_agent TEXT,
+  timestamp TIMESTAMP DEFAULT NOW()
+);
+```
+
+## AI Content Processing Pipeline
+
+```typescript
+interface ContentIntelligence {
+  sentiment: 'positive' | 'negative' | 'neutral';
+  topics: string[];
+  language: string;
+  toxicity: number; // 0-1 scale
+  summary?: string;
+  entities: Array<{
+    type: 'person' | 'organization' | 'location';
+    value: string;
+    confidence: number;
+  }>;
+}
+
+// Standard AI processing pipeline
+async function analyzeContent(
+  content: string,
+  options: {
+    includeSentiment?: boolean;
+    includeTopics?: boolean;
+    includeSummary?: boolean;
+    includeEntities?: boolean;
+  }
+): Promise<ContentIntelligence> {
+  // Implementation with fallbacks for each AI service
+}
+```
+
+## Examples
+
+<example>
+```typescript
+// Valid: Enterprise-compliant bridge creation
+async function createEnterpriseBridge(request: CreateBridgeRequest, context: EnterpriseSecurityContext) {
+  return executeWithSecurityContext(async () => {
+    // Validate enterprise quotas
+    await validateEnterpriseQuotas(context.customerId);
+    
+    // Create bridge with tenant isolation
+    const bridge = await createBridge({
+      ...request,
+      tenantId: context.tenantId,
+      encryptionKeyId: context.customer.encryptionKeyId
+    });
+    
+    // Apply enterprise policies
+    await applyRetentionPolicy(bridge.id, context.retentionPolicy);
+    
+    return bridge;
+  }, context);
+}
+
+// Valid: AI translation with fallback
+async function translateMessage(message: string, targetLang: string): Promise<string> {
+  return executeAIFeature(
+    () => aiTranslateService.translate(message, targetLang),
+    () => basicTranslateService.translate(message, targetLang),
+    {
+      service: 'google',
+      fallbackStrategy: 'basic',
+      dataRetention: 'none',
+      privacy: 'enterprise'
+    }
+  );
+}
+```
+</example>
+
+<example type="invalid">
+```typescript
+// Invalid: Missing security context
+async function createBridge(request: CreateBridgeRequest) {
+  // No security validation!
+  const bridge = await bridgeService.create(request);
+  return bridge;
+}
+
+// Invalid: AI service without fallback
+async function summarizeConversation(messages: Message[]): Promise<string> {
+  // What happens when OpenAI is down?
+  return await openai.createChatCompletion({
+    messages: messages.map(m => ({ role: 'user', content: m.content }))
+  });
+}
+
+// Invalid: Shared data across tenants
+SELECT * FROM bridges WHERE user_id = ?;  -- No tenant isolation!
+```
+</example>

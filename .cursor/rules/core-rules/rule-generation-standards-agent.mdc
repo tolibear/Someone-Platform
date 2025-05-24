@@ -1,0 +1,370 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Rule Generation Standards for Someone Platform
+
+## Critical Rules
+
+- **MDC Format Only**: All Cursor rules MUST use .mdc file extension with proper frontmatter
+- **Proper Organization**: Rules MUST be organized in appropriate folders under .cursor/rules/
+- **Complete Frontmatter**: Every rule MUST include description, globs, and alwaysApply fields
+- **Rule Type Classification**: Rules MUST follow naming conventions based on their purpose and application
+- **Actionable Content**: Rules MUST contain specific, actionable directives using MUST/SHOULD language
+- **Examples Required**: Include both valid and invalid examples for clarity
+- **Regular Maintenance**: Rules MUST be reviewed and updated when features or standards change
+
+## Rule File Format Standards
+
+### Frontmatter Requirements
+```yaml
+---
+description: Comprehensive description that provides full context and clearly indicates when this rule should be applied. Include key scenarios, impacted areas, and why following this rule is important. While being thorough, remain focused and relevant. The description should be detailed enough that the agent can confidently determine whether to apply the rule in any given situation.
+globs: # Blank for agent rules, specific patterns for auto rules
+alwaysApply: false # true only for always rules
+---
+```
+
+### Rule Content Structure
+```markdown
+# Rule Title
+
+## Critical Rules
+
+- **Rule Name**: Specific directive with clear expectations
+- **Another Rule**: Technical requirement with measurable criteria
+
+## [Section Headers as Needed]
+
+Detailed implementation guidance and standards.
+
+## Examples
+
+<example>
+  Valid implementation showing correct approach
+</example>
+
+<example type="invalid">
+  Invalid implementation showing what to avoid
+</example>
+```
+
+## Rule Organization Structure
+
+### Directory Categories
+```
+.cursor/rules/
+├── core-rules/              # Fundamental development and architecture
+│   ├── platform-architecture-standards.mdc
+│   ├── documentation-development-agent.mdc
+│   ├── rule-generation-standards-agent.mdc
+│   └── someone-enterprise-ai-features-agent.mdc
+├── ui-rules/                # User interface and design standards
+│   ├── shadcn-ui-development-agent.mdc
+│   ├── responsive-design-standards-agent.mdc
+│   └── accessibility-guidelines-agent.mdc
+├── global-rules/            # Rules that apply to every interaction
+│   ├── emoji-communication-always.mdc
+│   └── someone-project-structure-always.mdc
+├── tool-rules/              # Tool-specific usage guidelines
+│   ├── git-commit-push-agent.mdc
+│   ├── database-migration-agent.mdc
+│   └── testing-framework-agent.mdc
+├── ts-rules/                # TypeScript specific standards
+│   ├── typescript-best-practices-agent.mdc
+│   └── type-safety-standards-agent.mdc
+├── py-rules/                # Python specific standards (if needed)
+└── testing-rules/           # Testing and quality assurance
+    ├── unit-testing-standards-agent.mdc
+    └── integration-testing-agent.mdc
+```
+
+## Rule Type Classifications
+
+### Rule Type Naming Conventions
+
+#### Always Rules (-always.mdc)
+- **Purpose**: Apply to every conversation and interaction
+- **Frontmatter**: `description: ""`, `globs: ""`, `alwaysApply: true`
+- **Example**: `emoji-communication-always.mdc`
+- **Usage**: Global behaviors that should never be optional
+
+#### Auto Rules (-auto.mdc)  
+- **Purpose**: Apply automatically when specific file patterns are matched
+- **Frontmatter**: `description: ""`, `globs: "*.ts, *.tsx"`, `alwaysApply: false`
+- **Example**: `typescript-linting-auto.mdc`
+- **Usage**: File-type specific standards that trigger on file patterns
+
+#### Agent Rules (-agent.mdc)
+- **Purpose**: Selective application based on context and need
+- **Frontmatter**: `description: "Detailed context..."`, `globs: ""`, `alwaysApply: false`
+- **Example**: `shadcn-ui-development-agent.mdc`
+- **Usage**: Feature-specific or contextual standards
+
+#### Manual Rules (-manual.mdc)
+- **Purpose**: Explicitly invoked by user request
+- **Frontmatter**: `description: ""`, `globs: ""`, `alwaysApply: false`
+- **Example**: `database-backup-manual.mdc`
+- **Usage**: Procedures that require explicit user initiation
+
+## Rule Content Standards
+
+### Critical Rules Section Format
+```markdown
+## Critical Rules
+
+- **Performance First**: All database queries MUST execute under 100ms
+- **Security Validation**: Input validation MUST occur before processing
+- **Error Handling**: All API endpoints MUST return structured error responses
+- **Type Safety**: Public interfaces MUST export TypeScript definitions
+```
+
+### Examples Section Requirements
+```markdown
+## Examples
+
+<example>
+```typescript
+// Valid: Proper error handling
+try {
+  const result = await apiCall();
+  return { success: true, data: result };
+} catch (error) {
+  return { success: false, error: error.message };
+}
+```
+</example>
+
+<example type="invalid">
+```typescript
+// Invalid: No error handling
+const result = await apiCall(); // Could throw and crash
+return result;
+```
+</example>
+```
+
+## Platform-Specific Rule Patterns
+
+### Someone Platform Rules
+```markdown
+# Someone [Feature] Development Standards
+
+## Critical Rules
+
+- **Universal Abstraction**: Platform-specific code MUST use universal interfaces
+- **Bridge Management**: All bridge operations MUST support multi-platform scenarios
+- **Real-time Sync**: Message processing MUST maintain sub-second latency
+- **Enterprise Ready**: Features MUST support enterprise security requirements
+
+## Implementation Patterns
+
+### Universal Message Processing
+```typescript
+interface UniversalMessage {
+  id: string;
+  bridgeId: string;
+  platform: PlatformType;
+  content: string;
+  timestamp: Date;
+  metadata: Record<string, unknown>;
+}
+
+// Platform connectors must implement universal interface
+class DiscordConnector implements PlatformConnector {
+  async sendMessage(message: UniversalMessage): Promise<void> {
+    // Platform-specific implementation
+  }
+}
+```
+```
+
+### Enterprise Feature Rules
+```markdown
+# Enterprise Feature Development Standards
+
+## Critical Rules
+
+- **Audit Everything**: All enterprise actions MUST generate audit logs
+- **Data Isolation**: Multi-tenant data MUST be completely isolated
+- **Compliance First**: Features MUST meet SOC 2 and GDPR requirements
+- **Performance SLA**: Enterprise features MUST meet 99.9% uptime
+
+## Security Patterns
+
+### Audit Logging
+```typescript
+interface AuditEvent {
+  userId: string;
+  action: string;
+  resource: string;
+  timestamp: Date;
+  metadata: Record<string, any>;
+}
+
+const auditLog = async (event: AuditEvent): Promise<void> => {
+  await database.auditLogs.create(event);
+  await complianceNotifier.notify(event);
+};
+```
+```
+
+## Rule Quality Assurance
+
+### Rule Validation Checklist
+- [ ] Frontmatter includes all required fields
+- [ ] Description clearly indicates when to apply the rule
+- [ ] Critical rules use MUST/SHOULD language
+- [ ] Both valid and invalid examples included
+- [ ] Examples use realistic code from the platform
+- [ ] Rule addresses specific development scenarios
+- [ ] Content is actionable and measurable
+
+### Automated Validation
+```yaml
+# GitHub Actions for rule validation
+name: Rule Quality Check
+
+on:
+  push:
+    paths: ['.cursor/rules/**/*.mdc']
+
+jobs:
+  validate-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Rule Format
+        run: |
+          python scripts/validate-mdc-format.py
+          python scripts/check-frontmatter.py
+          python scripts/validate-examples.py
+```
+
+## Rule Maintenance Process
+
+### Regular Review Cycle
+1. **Monthly**: Review rule effectiveness and usage metrics
+2. **Quarterly**: Update examples with current codebase patterns  
+3. **Feature Releases**: Update rules for new platform capabilities
+4. **Major Updates**: Validate rule compliance across repositories
+
+### Rule Evolution Guidelines
+```markdown
+## Rule Update Process
+
+1. **Identify Need**: Rule no longer reflects current practices
+2. **Draft Changes**: Update content and examples
+3. **Validate Impact**: Test rule changes with current codebase
+4. **Update References**: Ensure related rules remain consistent
+5. **Deploy Changes**: Commit updated rule to repository
+6. **Monitor Effectiveness**: Track rule application success
+```
+
+## Examples
+
+<example>
+```markdown
+---
+description: TypeScript development standards for the Someone platform. Apply when writing TypeScript code, creating interfaces, implementing type-safe functions, or working with platform connectors. Essential for maintaining type safety, performance, and code quality across all TypeScript components.
+globs: 
+alwaysApply: false
+---
+
+# TypeScript Development Standards
+
+## Critical Rules
+
+- **Strict Mode Required**: All TypeScript projects MUST use strict mode
+- **Interface Exports**: Public APIs MUST export TypeScript interfaces
+- **Generic Constraints**: Use generic constraints for type safety
+- **Error Types**: Define custom error classes for different categories
+
+## Platform Interfaces
+
+### Universal Message Interface
+```typescript
+interface UniversalMessage {
+  id: string;
+  platform: 'discord' | 'slack' | 'teams' | 'telegram';
+  content: string;
+  metadata: Record<string, unknown>;
+}
+```
+
+## Examples
+
+<example>
+```typescript
+// Valid: Proper interface definition
+interface BridgeConfig {
+  readonly id: string;
+  name: string;
+  platforms: PlatformEndpoint[];
+  settings: BridgeSettings;
+}
+```
+</example>
+
+<example type="invalid">
+```typescript
+// Invalid: Using any type
+interface BridgeConfig {
+  data: any; // No type safety
+  settings: any; // Avoid any types
+}
+```
+</example>
+```
+</example>
+
+<example type="invalid">
+```markdown
+# some rule
+
+use good practices
+
+```typescript
+const x = anything;
+```
+
+this is important but not specific
+```
+</example>
+
+## Integration with Development Workflow
+
+### IDE Configuration
+```json
+// .vscode/settings.json for rule compliance
+{
+  "files.associations": {
+    "*.mdc": "markdown"
+  },
+  "markdown.validate.enabled": true,
+  "markdown.validate.fileLinks.enabled": true
+}
+```
+
+### Rule Application Tracking
+```typescript
+// Track rule effectiveness
+interface RuleMetrics {
+  ruleName: string;
+  applicationsThisMonth: number;
+  successRate: number;
+  developerFeedback: number; // 1-5 rating
+  lastUpdated: Date;
+}
+
+const trackRuleUsage = async (ruleName: string, success: boolean) => {
+  await metrics.record({
+    rule: ruleName,
+    applied: true,
+    successful: success,
+    timestamp: new Date()
+  });
+};
+```
+
+This comprehensive framework ensures all Someone platform rules maintain high quality, clear application guidelines, and measurable effectiveness across the development lifecycle 🎯 

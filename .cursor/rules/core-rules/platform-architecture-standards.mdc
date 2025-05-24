@@ -1,0 +1,661 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Platform Architecture Standards for Someone Universal Chat Bridge
+
+## Critical Rules
+
+- **Universal Interfaces First**: All platform integrations MUST implement the standardized PlatformConnector interface
+- **Event-Driven Design**: Use event emitters for cross-platform message propagation, avoid direct coupling
+- **Stateless Connectors**: Platform connectors MUST be stateless and only handle protocol translation
+- **Error Isolation**: Platform failures MUST NOT cascade to other connected platforms
+- **Graceful Degradation**: When one platform fails, others MUST continue operating normally
+- **Rate Limit Compliance**: Each connector MUST respect platform-specific rate limits independently
+- **Authentication Separation**: Platform credentials MUST be isolated and encrypted per platform
+- **Message Transformation**: All messages MUST be converted to UniversalMessage format before processing
+
+## Universal Message Architecture
+
+### Core Message Interface
+```typescript
+interface UniversalMessage {
+  // Identity and routing
+  id: string;                           // Unique message identifier
+  bridgeId: string;                     // Bridge this message belongs to
+  correlationId?: string;               // For tracking message flow
+  
+  // Platform context
+  platform: PlatformType;              // Source platform
+  platformChannelId: string;           // Platform-specific channel ID
+  platformUserId: string;              // Platform-specific user ID
+  platformMessageId: string;           // Original message ID on platform
+  
+  // Content
+  content: string;                      // Main message text
+  contentType: 'text' | 'rich' | 'media'; // Content classification
+  attachments: UniversalAttachment[];   // Files, images, etc.
+  embeds: UniversalEmbed[];            // Rich content blocks
+  reactions: UniversalReaction[];       // Emoji reactions
+  
+  // Metadata
+  timestamp: Date;                      // When message was created
+  editedAt?: Date;                     // When message was last edited
+  replyTo?: string;                    // ID of message being replied to
+  threadId?: string;                   // Thread/conversation ID
+  mentions: UniversalMention[];        // User/role mentions
+  
+  // Processing flags
+  isFromBot: boolean;                  // Originated from a bot
+  isFromWebhook: boolean;              // Came via webhook
+  requiresTranslation: boolean;        // Needs language translation
+  moderationStatus: 'pending' | 'approved' | 'rejected'; // Content moderation
+  
+  // Bridge metadata
+  metadata: Record<string, unknown>;   // Platform-specific extras
+  processingMetadata: {                // Bridge processing info
+    receivedAt: Date;
+    processedAt?: Date;
+    forwardedTo: string[];            // List of target platforms
+    errors: ProcessingError[];        // Any processing errors
+  };
+}
+
+type PlatformType = 'discord' | 'slack' | 'teams' | 'telegram' | 'custom';
+
+interface UniversalAttachment {
+  id: string;
+  name: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  thumbnail?: string;
+}
+
+interface UniversalReaction {
+  emoji: string;               // Unicode emoji or custom emoji identifier
+  count: number;              // Number of users who reacted
+  users: string[];            // Platform user IDs who reacted
+  isCustomEmoji: boolean;     // Whether this is a custom emoji
+  emojiUrl?: string;         // URL for custom emoji
+}
+
+interface UniversalMention {
+  type: 'user' | 'role' | 'channel' | 'everyone';
+  id: string;                 // Platform-specific ID
+  displayName: string;        // Human-readable name
+  platformSpecific?: any;     // Platform-specific mention data
+}
+```
+
+### Platform Connector Interface
+```typescript
+interface PlatformConnector {
+  // Connector identity
+  readonly platform: PlatformType;
+  readonly version: string;
+  readonly capabilities: ConnectorCapabilities;
+  
+  // Lifecycle management
+  initialize(config: PlatformConfig): Promise<void>;
+  authenticate(credentials: PlatformCredentials): Promise<AuthResult>;
+  disconnect(): Promise<void>;
+  
+  // Message operations
+  sendMessage(message: UniversalMessage, targetChannel: string): Promise<PlatformMessageResult>;
+  editMessage(messageId: string, newContent: string): Promise<void>;
+  deleteMessage(messageId: string): Promise<void>;
+  
+  // Reaction operations
+  addReaction(messageId: string, emoji: string): Promise<void>;
+  removeReaction(messageId: string, emoji: string, userId?: string): Promise<void>;
+  
+  // Channel operations
+  getChannelInfo(channelId: string): Promise<ChannelInfo>;
+  validateChannelAccess(channelId: string): Promise<boolean>;
+  
+  // User operations
+  getUserInfo(userId: string): Promise<UserInfo>;
+  getUserPermissions(userId: string, channelId: string): Promise<Permission[]>;
+  
+  // Event handling
+  onMessage(callback: (message: UniversalMessage) => void): void;
+  onMessageEdit(callback: (messageId: string, newContent: string) => void): void;
+  onMessageDelete(callback: (messageId: string) => void): void;
+  onReactionAdd(callback: (reaction: UniversalReaction) => void): void;
+  onReactionRemove(callback: (reaction: UniversalReaction) => void): void;
+  
+  // Webhook management
+  createWebhook(channelId: string): Promise<WebhookInfo>;
+  deleteWebhook(webhookId: string): Promise<void>;
+  
+  // Health and monitoring
+  getHealth(): Promise<HealthStatus>;
+  getMetrics(): Promise<ConnectorMetrics>;
+}
+
+interface ConnectorCapabilities {
+  supportsRichText: boolean;
+  supportsAttachments: boolean;
+  supportsReactions: boolean;
+  supportsThreads: boolean;
+  supportsEditing: boolean;
+  supportsTypingIndicators: boolean;
+  maxMessageLength: number;
+  maxAttachmentSize: number;
+  supportedMimeTypes: string[];
+}
+```
+
+## Bridge Management Architecture
+
+### Bridge Configuration
+```typescript
+interface Bridge {
+  id: string;
+  name: string;
+  description?: string;
+  ownerId: string;                     // User who created the bridge
+  organizationId?: string;             // Enterprise organization
+  
+  // Platform connections
+  endpoints: BridgeEndpoint[];
+  
+  // Bridge settings
+  settings: BridgeSettings;
+  
+  // State management
+  status: 'active' | 'paused' | 'error' | 'configuring';
+  health: BridgeHealth;
+  
+  // Metadata
+  createdAt: Date;
+  updatedAt: Date;
+  lastActivity?: Date;
+  
+  // Metrics
+  metrics: BridgeMetrics;
+}
+
+interface BridgeEndpoint {
+  id: string;
+  platform: PlatformType;
+  channelId: string;
+  guildId?: string;               // Discord guild, Slack workspace, etc.
+  
+  // Connection state
+  status: 'connected' | 'connecting' | 'disconnected' | 'error';
+  lastConnected?: Date;
+  connectionError?: string;
+  
+  // Platform-specific configuration
+  webhookId?: string;
+  credentials: EncryptedCredentials;
+  permissions: Permission[];
+  
+  // Feature flags
+  features: {
+    sendMessages: boolean;
+    receiveMessages: boolean;
+    handleReactions: boolean;
+    handleEdits: boolean;
+    handleDeletes: boolean;
+  };
+}
+
+interface BridgeSettings {
+  // Message processing
+  messageProcessing: {
+    enableTranslation: boolean;
+    targetLanguages: string[];
+    preserveFormatting: boolean;
+    linkWrapping: boolean;
+    linkWhitelist: string[];
+  };
+  
+  // Content filtering
+  moderation: {
+    level: 'none' | 'basic' | 'strict';
+    blockProfanity: boolean;
+    requireApproval: boolean;
+    autoDeleteViolations: boolean;
+  };
+  
+  // User experience
+  userExperience: {
+    showPlatformLabels: boolean;
+    preserveUsernames: boolean;
+    syncTypingIndicators: boolean;
+    syncPresence: boolean;
+  };
+  
+  // Rate limiting
+  rateLimiting: {
+    maxMessagesPerMinute: number;
+    burstAllowance: number;
+    backoffStrategy: 'linear' | 'exponential';
+  };
+}
+```
+
+## Event System Architecture
+
+### Universal Event System
+```typescript
+interface BridgeEventEmitter extends EventEmitter {
+  // Message events
+  on(event: 'message:received', listener: (message: UniversalMessage) => void): this;
+  on(event: 'message:sent', listener: (message: UniversalMessage, targets: string[]) => void): this;
+  on(event: 'message:edited', listener: (messageId: string, newContent: string) => void): this;
+  on(event: 'message:deleted', listener: (messageId: string) => void): this;
+  
+  // Reaction events
+  on(event: 'reaction:added', listener: (reaction: UniversalReaction) => void): this;
+  on(event: 'reaction:removed', listener: (reaction: UniversalReaction) => void): this;
+  
+  // Platform events
+  on(event: 'platform:connected', listener: (platform: PlatformType, endpoint: string) => void): this;
+  on(event: 'platform:disconnected', listener: (platform: PlatformType, endpoint: string) => void): this;
+  on(event: 'platform:error', listener: (platform: PlatformType, error: Error) => void): this;
+  
+  // Bridge events
+  on(event: 'bridge:created', listener: (bridge: Bridge) => void): this;
+  on(event: 'bridge:updated', listener: (bridge: Bridge) => void): this;
+  on(event: 'bridge:deleted', listener: (bridgeId: string) => void): this;
+  
+  // System events
+  on(event: 'system:health_check', listener: (status: SystemHealth) => void): this;
+  on(event: 'system:metrics_update', listener: (metrics: SystemMetrics) => void): this;
+}
+
+// Event processing pipeline
+class EventProcessor {
+  async processMessage(message: UniversalMessage, bridge: Bridge): Promise<void> {
+    try {
+      // 1. Validate message
+      await this.validateMessage(message);
+      
+      // 2. Apply content filtering
+      const filteredMessage = await this.applyModeration(message, bridge.settings.moderation);
+      
+      // 3. Apply transformations
+      const transformedMessage = await this.applyTransformations(filteredMessage, bridge.settings);
+      
+      // 4. Route to target platforms
+      await this.routeMessage(transformedMessage, bridge);
+      
+      // 5. Track metrics
+      await this.trackMessageMetrics(transformedMessage, bridge);
+      
+    } catch (error) {
+      await this.handleProcessingError(error, message, bridge);
+    }
+  }
+}
+```
+
+## Error Handling and Resilience
+
+### Error Classification
+```typescript
+abstract class SomeoneError extends Error {
+  abstract readonly code: string;
+  abstract readonly category: 'platform' | 'validation' | 'network' | 'security' | 'configuration';
+  abstract readonly severity: 'low' | 'medium' | 'high' | 'critical';
+  abstract readonly retryable: boolean;
+  
+  readonly timestamp: Date;
+  readonly context?: Record<string, unknown>;
+  
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message);
+    this.timestamp = new Date();
+    this.context = context;
+  }
+}
+
+class PlatformConnectionError extends SomeoneError {
+  readonly code = 'PLATFORM_CONNECTION_FAILED';
+  readonly category = 'platform';
+  readonly severity = 'high';
+  readonly retryable = true;
+}
+
+class MessageValidationError extends SomeoneError {
+  readonly code = 'MESSAGE_VALIDATION_FAILED';
+  readonly category = 'validation';
+  readonly severity = 'medium';
+  readonly retryable = false;
+}
+
+class RateLimitExceededError extends SomeoneError {
+  readonly code = 'RATE_LIMIT_EXCEEDED';
+  readonly category = 'network';
+  readonly severity = 'medium';
+  readonly retryable = true;
+  
+  constructor(platform: string, resetTime: Date) {
+    super(`Rate limit exceeded for ${platform}, resets at ${resetTime.toISOString()}`);
+  }
+}
+```
+
+### Resilience Patterns
+```typescript
+class ResilienceManager {
+  private circuitBreakers = new Map<string, CircuitBreaker>();
+  private retryPolicies = new Map<string, RetryPolicy>();
+  
+  async executeWithResilience<T>(
+    operation: () => Promise<T>,
+    context: {
+      platform: PlatformType;
+      operation: string;
+      retryable: boolean;
+    }
+  ): Promise<T> {
+    const circuitBreaker = this.getCircuitBreaker(context.platform);
+    
+    if (circuitBreaker.isOpen) {
+      throw new Error(`Circuit breaker open for ${context.platform}`);
+    }
+    
+    try {
+      const result = await this.executeWithRetry(operation, context);
+      circuitBreaker.recordSuccess();
+      return result;
+    } catch (error) {
+      circuitBreaker.recordFailure();
+      throw error;
+    }
+  }
+  
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    context: { platform: PlatformType; retryable: boolean }
+  ): Promise<T> {
+    const retryPolicy = this.getRetryPolicy(context.platform);
+    
+    let lastError: Error;
+    for (let attempt = 0; attempt <= retryPolicy.maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        if (!context.retryable || attempt === retryPolicy.maxAttempts) {
+          throw error;
+        }
+        
+        const delay = retryPolicy.calculateDelay(attempt);
+        await this.sleep(delay);
+      }
+    }
+    
+    throw lastError!;
+  }
+}
+```
+
+## Data Flow and Message Routing
+
+### Message Flow Pipeline
+```typescript
+class MessageRouter {
+  async routeMessage(message: UniversalMessage, bridge: Bridge): Promise<void> {
+    const sourceEndpoint = bridge.endpoints.find(e => 
+      e.platform === message.platform && 
+      e.channelId === message.platformChannelId
+    );
+    
+    if (!sourceEndpoint) {
+      throw new Error(`Source endpoint not found for message ${message.id}`);
+    }
+    
+    // Get target endpoints (all except source)
+    const targetEndpoints = bridge.endpoints.filter(e => e.id !== sourceEndpoint.id);
+    
+    // Route to each target platform
+    const routingPromises = targetEndpoints.map(async (endpoint) => {
+      try {
+        const connector = this.getConnector(endpoint.platform);
+        const platformMessage = await this.transformMessage(message, endpoint);
+        await connector.sendMessage(platformMessage, endpoint.channelId);
+        
+        // Record successful delivery
+        await this.recordDelivery(message.id, endpoint.id, 'success');
+      } catch (error) {
+        // Record failed delivery
+        await this.recordDelivery(message.id, endpoint.id, 'failed', error.message);
+        
+        // Don't throw - continue routing to other platforms
+        console.error(`Failed to route message to ${endpoint.platform}:`, error);
+      }
+    });
+    
+    // Wait for all routing attempts to complete
+    await Promise.allSettled(routingPromises);
+  }
+  
+  private async transformMessage(
+    message: UniversalMessage, 
+    targetEndpoint: BridgeEndpoint
+  ): Promise<UniversalMessage> {
+    const transformer = this.getTransformer(targetEndpoint.platform);
+    return await transformer.transform(message, targetEndpoint);
+  }
+}
+```
+
+## Examples
+
+### Valid: Proper Platform Connector Implementation
+```typescript
+class DiscordConnector implements PlatformConnector {
+  readonly platform = 'discord' as const;
+  readonly version = '1.0.0';
+  readonly capabilities: ConnectorCapabilities = {
+    supportsRichText: true,
+    supportsAttachments: true,
+    supportsReactions: true,
+    supportsThreads: true,
+    supportsEditing: true,
+    supportsTypingIndicators: true,
+    maxMessageLength: 2000,
+    maxAttachmentSize: 8 * 1024 * 1024, // 8MB
+    supportedMimeTypes: ['image/*', 'video/*', 'text/*']
+  };
+  
+  private client: DiscordClient;
+  private eventEmitter: EventEmitter;
+  
+  async sendMessage(message: UniversalMessage, targetChannel: string): Promise<PlatformMessageResult> {
+    try {
+      const channel = await this.client.channels.fetch(targetChannel);
+      if (!channel?.isTextBased()) {
+        throw new Error(`Channel ${targetChannel} is not a text channel`);
+      }
+      
+      const discordMessage = await this.transformToDiscordMessage(message);
+      const sentMessage = await channel.send(discordMessage);
+      
+      return {
+        success: true,
+        platformMessageId: sentMessage.id,
+        timestamp: sentMessage.createdAt
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        retryable: this.isRetryableError(error)
+      };
+    }
+  }
+  
+  onMessage(callback: (message: UniversalMessage) => void): void {
+    this.client.on('messageCreate', async (discordMessage) => {
+      if (discordMessage.author.bot) return;
+      
+      const universalMessage = await this.transformFromDiscordMessage(discordMessage);
+      callback(universalMessage);
+    });
+  }
+  
+  private async transformFromDiscordMessage(message: DiscordMessage): Promise<UniversalMessage> {
+    return {
+      id: generateId(),
+      bridgeId: this.getBridgeIdForChannel(message.channel.id),
+      platform: 'discord',
+      platformChannelId: message.channel.id,
+      platformUserId: message.author.id,
+      platformMessageId: message.id,
+      content: message.content,
+      contentType: 'text',
+      attachments: message.attachments.map(this.transformAttachment),
+      reactions: message.reactions.cache.map(this.transformReaction),
+      timestamp: message.createdAt,
+      isFromBot: message.author.bot,
+      isFromWebhook: !!message.webhookId,
+      requiresTranslation: false,
+      moderationStatus: 'pending',
+      mentions: this.extractMentions(message),
+      metadata: {
+        guildId: message.guild?.id,
+        channelType: message.channel.type
+      },
+      processingMetadata: {
+        receivedAt: new Date(),
+        forwardedTo: [],
+        errors: []
+      }
+    };
+  }
+}
+```
+
+### Invalid: Tightly Coupled Implementation
+```typescript
+// DON'T DO THIS - Platform-specific code in business logic
+class MessageHandler {
+  async handleMessage(message: any) {
+    if (message.platform === 'discord') {
+      // Discord-specific handling mixed with business logic
+      const webhook = await createDiscordWebhook(message.channel);
+      await webhook.send({
+        content: message.content,
+        username: message.author.username,
+        avatarURL: message.author.avatar
+      });
+    } else if (message.platform === 'slack') {
+      // Slack-specific handling mixed with business logic
+      await slackClient.chat.postMessage({
+        channel: message.channel,
+        text: message.content,
+        username: message.user.name,
+        icon_url: message.user.avatar
+      });
+    }
+    // This approach doesn't scale and violates abstraction principles
+  }
+}
+```
+
+### Valid: Universal Bridge Management
+```typescript
+class BridgeManager {
+  async createBridge(config: CreateBridgeConfig): Promise<Bridge> {
+    // Validate configuration
+    await this.validateBridgeConfig(config);
+    
+    // Create bridge entity
+    const bridge: Bridge = {
+      id: generateId(),
+      name: config.name,
+      description: config.description,
+      ownerId: config.ownerId,
+      endpoints: [],
+      settings: this.getDefaultSettings(),
+      status: 'configuring',
+      health: { overall: 'unknown', endpoints: [] },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metrics: this.initializeMetrics()
+    };
+    
+    // Add platform endpoints
+    for (const endpointConfig of config.endpoints) {
+      const endpoint = await this.createEndpoint(endpointConfig, bridge.id);
+      bridge.endpoints.push(endpoint);
+    }
+    
+    // Test all connections
+    const connectionTests = await this.testAllConnections(bridge);
+    if (connectionTests.some(test => !test.success)) {
+      bridge.status = 'error';
+      throw new Error('Some platform connections failed');
+    }
+    
+    // Activate bridge
+    bridge.status = 'active';
+    bridge.updatedAt = new Date();
+    
+    // Save to database
+    await this.saveBridge(bridge);
+    
+    // Start event listeners
+    await this.startBridgeListeners(bridge);
+    
+    this.eventEmitter.emit('bridge:created', bridge);
+    return bridge;
+  }
+  
+  private async createEndpoint(
+    config: EndpointConfig, 
+    bridgeId: string
+  ): Promise<BridgeEndpoint> {
+    const connector = this.getConnector(config.platform);
+    
+    // Test authentication
+    const authResult = await connector.authenticate(config.credentials);
+    if (!authResult.success) {
+      throw new Error(`Authentication failed for ${config.platform}`);
+    }
+    
+    // Validate channel access
+    const hasAccess = await connector.validateChannelAccess(config.channelId);
+    if (!hasAccess) {
+      throw new Error(`No access to channel ${config.channelId} on ${config.platform}`);
+    }
+    
+    // Create webhook if needed
+    let webhookId: string | undefined;
+    if (connector.capabilities.supportsWebhooks) {
+      const webhook = await connector.createWebhook(config.channelId);
+      webhookId = webhook.id;
+    }
+    
+    return {
+      id: generateId(),
+      platform: config.platform,
+      channelId: config.channelId,
+      guildId: config.guildId,
+      status: 'connected',
+      lastConnected: new Date(),
+      webhookId,
+      credentials: await this.encryptCredentials(config.credentials),
+      permissions: await connector.getUserPermissions(config.userId, config.channelId),
+      features: {
+        sendMessages: true,
+        receiveMessages: true,
+        handleReactions: connector.capabilities.supportsReactions,
+        handleEdits: connector.capabilities.supportsEditing,
+        handleDeletes: true
+      }
+    };
+  }
+}
+```
+
+This architecture ensures that the Someone platform can seamlessly integrate new communication platforms while maintaining high reliability, performance, and developer experience 🏗️

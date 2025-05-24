@@ -1,0 +1,494 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Documentation Development Standards for Someone Platform
+
+## Critical Rules
+
+- **Markdown First**: All documentation MUST be written in Markdown (.md) format for consistency and portability
+- **Living Documentation**: Documentation MUST be updated simultaneously with code changes, not after
+- **API-First Documentation**: REST API documentation MUST be generated from OpenAPI specifications
+- **Code Examples Required**: Every API endpoint and feature MUST include working code examples
+- **Multi-Audience Approach**: Write for developers, administrators, and end-users with clear sections
+- **Version Control Integration**: Documentation MUST be version-controlled alongside source code
+- **Search Optimization**: Structure content for easy discoverability and searchability
+- **Accessibility Compliance**: All documentation MUST meet web accessibility standards
+
+## Documentation Architecture
+
+### Repository Structure
+```
+Someone-Docs/
+├── docs/
+│   ├── getting-started/         # Quick start guides
+│   ├── api-reference/          # Auto-generated API docs
+│   │   ├── bridges/            # Bridge management APIs
+│   │   ├── platforms/          # Platform connector APIs
+│   │   ├── analytics/          # Analytics and metrics APIs
+│   │   └── webhooks/           # Webhook configuration APIs
+│   ├── guides/                 # Step-by-step tutorials
+│   │   ├── platform-setup/     # Platform-specific setup
+│   │   ├── bridge-creation/    # Bridge configuration guides
+│   │   ├── enterprise/         # Enterprise features
+│   │   └── troubleshooting/    # Common issues and solutions
+│   ├── examples/               # Code samples and implementations
+│   │   ├── slack-integration/  # Slack connector examples
+│   │   ├── teams-integration/  # Teams connector examples
+│   │   └── custom-connectors/  # Building custom platform connectors
+│   ├── architecture/           # Technical architecture docs
+│   │   ├── platform-abstraction/ # Abstraction layer design
+│   │   ├── security/           # Security and compliance
+│   │   └── deployment/         # Deployment strategies
+│   └── changelog/              # Version history and updates
+├── static/                     # Images, diagrams, assets
+├── src/                        # Documentation source code
+└── docusaurus.config.js        # Documentation site configuration
+```
+
+### Content Organization Standards
+
+#### Front Matter Format
+```markdown
+---
+id: bridge-creation-api
+title: Bridge Creation API
+description: Create and manage communication bridges between platforms
+sidebar_position: 2
+tags: [api, bridges, creation]
+---
+
+# Bridge Creation API
+
+Brief description of the API endpoint and its purpose.
+
+## Overview
+
+Detailed explanation of what this API does and when to use it.
+```
+
+#### Code Block Standards
+```markdown
+## Example Request
+
+```bash
+curl -X POST https://api.someone.com/v1/bridges \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "DevOps Team Bridge",
+    "platforms": [
+      {
+        "type": "discord",
+        "channelId": "123456789012345678",
+        "guildId": "987654321098765432"
+      },
+      {
+        "type": "slack",
+        "channelId": "C1234567890",
+        "workspaceId": "T0987654321"
+      }
+    ]
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "bridge_1234567890",
+  "name": "DevOps Team Bridge",
+  "status": "active",
+  "platforms": [
+    {
+      "type": "discord",
+      "channelId": "123456789012345678",
+      "status": "connected"
+    },
+    {
+      "type": "slack", 
+      "channelId": "C1234567890",
+      "status": "connected"
+    }
+  ],
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+```
+
+## API Documentation Standards
+
+### OpenAPI Specification Requirements
+```yaml
+# Bridge Creation Endpoint
+/bridges:
+  post:
+    summary: Create a new communication bridge
+    description: |
+      Creates a new bridge connecting multiple communication platforms.
+      Requires at least 2 platform connections to establish a bridge.
+    operationId: createBridge
+    tags:
+      - Bridges
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BridgeCreateRequest'
+          examples:
+            basic_bridge:
+              summary: Basic Discord-Slack bridge
+              value:
+                name: "Team Chat Bridge"
+                platforms:
+                  - type: discord
+                    channelId: "123456789012345678"
+                  - type: slack
+                    channelId: "C1234567890"
+    responses:
+      '201':
+        description: Bridge created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Bridge'
+      '400':
+        description: Invalid request parameters
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+```
+
+### Error Documentation Format
+```markdown
+## Error Responses
+
+| Status Code | Error Type | Description |
+|-------------|------------|-------------|
+| 400 | `INVALID_PLATFORM` | Unsupported platform type specified |
+| 401 | `UNAUTHORIZED` | Invalid or missing API key |
+| 403 | `INSUFFICIENT_PERMISSIONS` | User lacks required permissions |
+| 409 | `BRIDGE_EXISTS` | Bridge with same configuration already exists |
+| 429 | `RATE_LIMITED` | Too many requests, see rate limiting section |
+
+### Error Response Format
+```json
+{
+  "error": {
+    "type": "INVALID_PLATFORM",
+    "message": "Platform 'telegram' is not supported in your plan",
+    "details": {
+      "supportedPlatforms": ["discord", "slack"],
+      "upgradeUrl": "https://someone.com/upgrade"
+    }
+  }
+}
+```
+```
+
+## Tutorial and Guide Standards
+
+### Step-by-Step Format
+```markdown
+# Setting Up Your First Discord-Slack Bridge
+
+Learn how to connect Discord and Slack channels for seamless team communication.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- [ ] Someone account with API access
+- [ ] Discord server with Manage Channels permission
+- [ ] Slack workspace with appropriate permissions
+- [ ] Basic understanding of webhooks
+
+## Step 1: Configure Discord Integration
+
+1. **Create Discord Application**
+   
+   Navigate to the [Discord Developer Portal](mdc:Someone/Someone/https:/discord.com/developers/applications) and create a new application.
+
+   ![Discord Application Creation](mdc:Someone/static/img/discord-app-creation.png)
+
+2. **Generate Bot Token**
+   
+   ```bash
+   # Store your bot token securely
+   export DISCORD_BOT_TOKEN="your_bot_token_here"
+   ```
+
+3. **Invite Bot to Server**
+   
+   Use the OAuth2 URL generator to create an invite link with these permissions:
+   - Manage Webhooks
+   - Send Messages
+   - View Channels
+
+## Step 2: Configure Slack Integration
+
+[Continue with detailed steps...]
+
+## Troubleshooting
+
+### Common Issues
+
+**Problem**: Bridge shows "Connection Failed" status
+**Solution**: Verify bot permissions and channel access
+
+**Problem**: Messages not appearing in Slack
+**Solution**: Check webhook configuration and rate limits
+```
+
+## Code Examples Standards
+
+### SDK Examples
+```markdown
+## JavaScript/TypeScript SDK
+
+```typescript
+import { SomeoneClient } from '@someone/sdk';
+
+const client = new SomeoneClient({
+  apiKey: process.env.SOMEONE_API_KEY,
+  environment: 'production' // or 'sandbox'
+});
+
+// Create a bridge
+const bridge = await client.bridges.create({
+  name: 'My Team Bridge',
+  platforms: [
+    {
+      type: 'discord',
+      channelId: '123456789012345678',
+      credentials: {
+        botToken: process.env.DISCORD_BOT_TOKEN
+      }
+    },
+    {
+      type: 'slack',
+      channelId: 'C1234567890',
+      credentials: {
+        botToken: process.env.SLACK_BOT_TOKEN
+      }
+    }
+  ]
+});
+
+console.log(`Bridge created: ${bridge.id}`);
+```
+
+## Python SDK
+
+```python
+from someone import SomeoneClient
+
+client = SomeoneClient(
+    api_key=os.getenv('SOMEONE_API_KEY'),
+    environment='production'
+)
+
+# Create a bridge
+bridge = client.bridges.create(
+    name='My Team Bridge',
+    platforms=[
+        {
+            'type': 'discord',
+            'channelId': '123456789012345678',
+            'credentials': {
+                'botToken': os.getenv('DISCORD_BOT_TOKEN')
+            }
+        }
+    ]
+)
+
+print(f"Bridge created: {bridge.id}")
+```
+```
+
+## Documentation Testing Standards
+
+### Code Example Validation
+```javascript
+// Every code example MUST be tested automatically
+describe('Documentation Code Examples', () => {
+  test('Bridge creation example should work', async () => {
+    const client = new SomeoneClient({
+      apiKey: process.env.TEST_API_KEY,
+      environment: 'sandbox'
+    });
+    
+    const bridge = await client.bridges.create({
+      name: 'Test Bridge',
+      platforms: [
+        {
+          type: 'discord',
+          channelId: process.env.TEST_DISCORD_CHANNEL,
+          credentials: {
+            botToken: process.env.TEST_DISCORD_BOT_TOKEN
+          }
+        }
+      ]
+    });
+    
+    expect(bridge.id).toBeDefined();
+    expect(bridge.status).toBe('active');
+  });
+});
+```
+
+### Link Validation
+```javascript
+// Automated link checking for all documentation
+const checkLinks = async () => {
+  const markdownFiles = await glob('docs/**/*.md');
+  
+  for (const file of markdownFiles) {
+    const content = await fs.readFile(file, 'utf-8');
+    const links = extractMarkdownLinks(content);
+    
+    for (const link of links) {
+      if (link.startsWith('http')) {
+        const response = await fetch(link);
+        if (!response.ok) {
+          throw new Error(`Broken link in ${file}: ${link}`);
+        }
+      }
+    }
+  }
+};
+```
+
+## Content Style Guide
+
+### Writing Principles
+- **Clarity First**: Use simple, direct language
+- **Active Voice**: "Create a bridge" not "A bridge can be created"
+- **Consistent Terminology**: Always use "bridge" not "connection" or "link"
+- **Inclusive Language**: Use gender-neutral pronouns and inclusive examples
+- **Scannable Format**: Use headings, lists, and tables for easy scanning
+
+### Technical Terms Dictionary
+- **Bridge**: A connection between two or more communication platforms
+- **Connector**: Platform-specific integration module (Discord Connector, Slack Connector)
+- **Platform**: Communication service (Discord, Slack, Teams, Telegram)
+- **Channel**: Platform-specific communication endpoint
+- **Room**: Legacy term from Discord bot, now called "Bridge"
+- **Webhook**: HTTP endpoint for receiving platform events
+- **OAuth**: Authentication flow for platform access
+
+## Examples
+
+### Valid: Well-Structured Documentation
+```markdown
+# Platform Connector Development Guide
+
+Learn how to build custom platform connectors for the Someone bridge system.
+
+## Overview
+
+Platform connectors enable Someone to communicate with different chat platforms. This guide walks through creating a custom connector for a new platform.
+
+## Prerequisites
+
+- Node.js 16+ and TypeScript knowledge
+- Understanding of REST APIs and webhooks
+- Access to target platform's API documentation
+
+## Implementation Steps
+
+### 1. Create Connector Interface
+
+```typescript
+import { PlatformConnector, UniversalMessage } from '@someone/core';
+
+export class CustomPlatformConnector implements PlatformConnector {
+  platform = 'custom-platform';
+  
+  async authenticate(credentials: CustomCredentials): Promise<boolean> {
+    // Implementation details
+  }
+  
+  async sendMessage(message: UniversalMessage): Promise<void> {
+    // Implementation details
+  }
+}
+```
+
+### 2. Register Connector
+
+```typescript
+import { ConnectorRegistry } from '@someone/core';
+
+ConnectorRegistry.register('custom-platform', CustomPlatformConnector);
+```
+
+## Testing Your Connector
+
+[Detailed testing instructions...]
+
+## Deployment
+
+[Deployment and publishing steps...]
+```
+
+### Invalid: Poor Documentation Structure
+```markdown
+# how to use the api
+
+you can call the api to make bridges
+
+here's some code:
+
+```
+curl api.someone.com/bridges
+```
+
+it might work or not depends on your setup
+
+contact support if issues
+```
+
+## Documentation CI/CD Pipeline
+
+### Automated Checks
+```yaml
+# GitHub Actions workflow for documentation
+name: Documentation Quality Check
+
+on: [push, pull_request]
+
+jobs:
+  docs-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Validate Markdown
+        run: |
+          npm install -g markdownlint-cli
+          markdownlint docs/**/*.md
+      
+      - name: Check Links
+        run: |
+          npm install -g markdown-link-check
+          find docs -name "*.md" -exec markdown-link-check {} \;
+      
+      - name: Test Code Examples
+        run: |
+          npm test -- --testPathPattern=docs-examples
+      
+      - name: Build Documentation Site
+        run: |
+          npm run docs:build
+```
+
+### Metrics and Analytics
+- Track documentation page views and engagement
+- Monitor search queries to identify content gaps
+- Collect feedback through embedded forms
+- Measure developer onboarding success rates
+- A/B test different explanation approaches
